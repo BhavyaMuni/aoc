@@ -4,7 +4,6 @@ import (
 	_ "embed"
 	"flag"
 	"fmt"
-	"math"
 	"strconv"
 	"strings"
 
@@ -43,10 +42,33 @@ func main() {
 	}
 }
 
+func checkIncreasing(val, prev int) bool {
+	return val-prev <= 3 && val-prev >= 1
+}
+
+func checkDecreasing(val, prev int) bool {
+	return prev-val <= 3 && prev-val >= 1
+}
+
+func isSafe(values []int) (isIncreasing, isDecreasing bool) {
+	isDecreasing, isIncreasing = true, true
+	for i, val := range values {
+		if i == 0 {
+			continue
+		}
+		isDecreasing = checkDecreasing(val, values[i-1]) && isDecreasing
+		isIncreasing = checkIncreasing(val, values[i-1]) && isIncreasing
+		if !isDecreasing && !isIncreasing {
+			break
+		}
+	}
+	return
+}
+
 func part1(input string) int {
 	out := 0
 	for _, line := range strings.Split(input, "\n") {
-		isIncreasing, isDecreasing, isSafe := true, true, true
+		isIncreasing, isDecreasing := true, true
 		reports := []int{}
 
 		for _, c := range strings.Split(line, " ") {
@@ -57,18 +79,9 @@ func part1(input string) int {
 			reports = append(reports, val)
 		}
 
-		for i, val := range reports {
-			if i == 0 {
-				continue
-			}
+		isIncreasing, isDecreasing = isSafe(reports)
 
-			isDecreasing = val > reports[i-1] && isDecreasing
-			isIncreasing = val < reports[i-1] && isIncreasing
-			diff := math.Abs(float64(val - reports[i-1]))
-			isSafe = diff >= 1 && diff <= 3 && isSafe && (isDecreasing || isIncreasing)
-		}
-
-		if isSafe {
+		if isDecreasing || isIncreasing {
 			out++
 		}
 	}
@@ -76,5 +89,34 @@ func part1(input string) int {
 }
 
 func part2(input string) int {
-	return 0
+	out := 0
+	for _, line := range strings.Split(input, "\n") {
+		isIncreasing, isDecreasing := true, true
+		reports := []int{}
+
+		for _, c := range strings.Split(line, " ") {
+			val, err := strconv.Atoi(c)
+			if err != nil {
+				fmt.Println(err.Error())
+			}
+			reports = append(reports, val)
+		}
+
+		isIncreasing, isDecreasing = isSafe(reports)
+
+		if isDecreasing || isIncreasing {
+			out++
+		} else {
+			for i := 0; i < len(reports); i++ {
+				reportsWithout := append([]int{}, reports...)
+				reportsWithout = append(reportsWithout[:i], reportsWithout[i+1:]...)
+				isIncreasing, isDecreasing = isSafe(reportsWithout)
+				if isDecreasing || isIncreasing {
+					out++
+					break
+				}
+			}
+		}
+	}
+	return out
 }
