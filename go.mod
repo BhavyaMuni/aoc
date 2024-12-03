@@ -1,6 +1,6 @@
 module github.com/BhavyaMuni/aoc
 
-go 1.22.2
+go 1.23.3
 
 require golang.design/x/clipboard v0.7.0
 

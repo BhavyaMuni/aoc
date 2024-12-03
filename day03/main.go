@@ -57,9 +57,32 @@ func part1(input string) int {
 	}
 
 	return out
-
 }
 
 func part2(input string) int {
-	return 0
+	// match either mul() or do() don't()
+	re, error := regexp.Compile(`mul\([0-9]{1,3},[0-9]{1,3}\)|do\(\)|don't\(\)`)
+	if error != nil {
+		fmt.Println("Error compiling regex")
+	}
+
+	matches := re.FindAll([]byte(input), -1)
+	out := 0
+	enabled := true
+	for _, match := range matches {
+		switch string(match) {
+		case "do()":
+			enabled = true
+		case "don't()":
+			enabled = false
+		default:
+			if enabled {
+				var n1, n2 int
+				fmt.Sscanf(string(match), "mul(%d,%d)", &n1, &n2)
+				out += n1 * n2
+			}
+		}
+	}
+
+	return out
 }
