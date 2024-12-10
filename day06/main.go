@@ -98,6 +98,64 @@ func part1(input string) int {
 	return len(visited) + 1
 }
 
+var dirMap = map[rune][]int{
+	'N': {-1, 0},
+	'S': {1, 0},
+	'E': {0, 1},
+	'W': {0, -1},
+}
+
+func checkIsStuckInLoop(pos [2]int, board [][]rune) bool {
+	visited := make(map[[2]int]int)
+	dir := 'N'
+
+	for !(pos[0] == len(board)-1 || pos[0] == 0 || pos[1] == len(board[0])-1 || pos[1] == 0) {
+		if visited[pos] > 4 {
+			return true
+		}
+		nRow := pos[0] + dirMap[dir][0]
+		nCol := pos[1] + dirMap[dir][1]
+		if nRow < 0 || nCol < 0 || nRow >= len(board) || nCol >= len(board[0]) {
+			continue
+		}
+		next := board[nRow][nCol]
+		if next == '#' || next == 'O' {
+			dir = turnRight(dir)
+		} else {
+			pos[0] = nRow
+			pos[1] = nCol
+			visited[[2]int{nRow, nCol}]++
+		}
+	}
+	return false
+}
+
 func part2(input string) int {
-	panic("not implemented")
+	var board [][]rune
+
+	for _, line := range strings.Split(input, "\n") {
+		board = append(board, []rune(line))
+	}
+	pos := [2]int{0, 0}
+	for i, row := range board {
+		for j, col := range row {
+			if col == '^' {
+				pos = [2]int{i, j}
+			}
+		}
+	}
+
+	ct := 0
+	for i, row := range board {
+		for j, cell := range row {
+			if cell == '.' {
+				board[i][j] = 'O'
+				if checkIsStuckInLoop(pos, board) {
+					ct++
+				}
+				board[i][j] = '.'
+			}
+		}
+	}
+	return ct
 }
