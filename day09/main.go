@@ -31,12 +31,6 @@ func main() {
 		panic(err)
 	}
 
-	map1 := map[int]int{1: 2, 2: 1, 3: 3}
-
-	for k, v := range map1 {
-		fmt.Println(k, v)
-	}
-
 	if part == 1 {
 		ans := part1(input)
 		clipboard.Write(clipboard.FmtText, []byte(fmt.Sprintf("%v", ans)))
