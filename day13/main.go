@@ -57,20 +57,15 @@ func part1(input string) int {
 		fmt.Sscanf(lines[1], "Button B: X+%f, Y+%f", &eqA.B, &eqB.B)
 		fmt.Sscanf(lines[2], "Prize: X=%f, Y=%f", &eqA.C, &eqB.C)
 
-		targetA := eqA.C
-		targetB := eqB.C
-
 		eqB.B *= eqA.A
 		eqB.C *= eqA.A
 		eqA.B *= eqB.A
 		eqA.C *= eqB.A
 
-		b2 := float64(int((eqA.C - eqB.C) / (eqA.B - eqB.B)))
-		b1 := float64(int((eqA.C - (eqA.B * b2)) / (eqA.A * eqB.A)))
+		b2 := (eqA.C - eqB.C) / (eqA.B - eqB.B)
+		b1 := (eqA.C - (eqA.B * b2)) / (eqA.A * eqB.A)
 
-		eqAnswerCorrectA := (eqA.A*b1)+(eqA.B/eqB.A*b2) == targetA
-		eqAnswerCorrectB := (eqB.A*b1)+(eqB.B/eqA.A)*b2 == targetB
-		if eqAnswerCorrectA && eqAnswerCorrectB {
+		if b2 == float64(int(b2)) && b1 == float64(int(b1)) {
 			cost := b1*3 + b2*1
 			totalCost += int(cost)
 		}
@@ -80,5 +75,31 @@ func part1(input string) int {
 }
 
 func part2(input string) int {
-	return 0
+	totalCost := 0
+
+	for _, prizes := range strings.Split(input, "\n\n") {
+		lines := strings.Split(prizes, "\n")
+		var eqA, eqB Equation
+		fmt.Sscanf(lines[0], "Button A: X+%f, Y+%f", &eqA.A, &eqB.A)
+		fmt.Sscanf(lines[1], "Button B: X+%f, Y+%f", &eqA.B, &eqB.B)
+		fmt.Sscanf(lines[2], "Prize: X=%f, Y=%f", &eqA.C, &eqB.C)
+
+		eqA.C += 10000000000000
+		eqB.C += 10000000000000
+
+		eqB.B *= eqA.A
+		eqB.C *= eqA.A
+		eqA.B *= eqB.A
+		eqA.C *= eqB.A
+
+		b2 := (eqA.C - eqB.C) / (eqA.B - eqB.B)
+		b1 := (eqA.C - (eqA.B * b2)) / (eqA.A * eqB.A)
+
+		if b2 == float64(int(b2)) && b1 == float64(int(b1)) {
+			cost := b1*3 + b2*1
+			totalCost += int(cost)
+		}
+
+	}
+	return totalCost
 }
