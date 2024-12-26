@@ -1,12 +1,13 @@
 package main
 
 import (
+	"container/heap"
 	_ "embed"
 	"flag"
 	"fmt"
 	"math"
-	"reflect"
 	"strings"
+	"time"
 
 	"golang.design/x/clipboard"
 )
@@ -31,7 +32,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-
+	t := time.Now()
 	if part == 1 {
 		ans := part1(input)
 		clipboard.Write(clipboard.FmtText, []byte(fmt.Sprintf("%v", ans)))
@@ -41,9 +42,10 @@ func main() {
 		clipboard.Write(clipboard.FmtText, []byte(fmt.Sprintf("%v", ans)))
 		fmt.Println("Output:", ans)
 	}
+	fmt.Println("Time", time.Since(t))
 }
 
-type Node struct {
+type Node1 struct {
 	x, y, dx, dy, pts int
 	path              [][2]int
 	seen              map[[2]int]bool
@@ -71,8 +73,8 @@ func part1(input string) int {
 	dirs := [][2]int{{0, 1}, {1, 0}, {0, -1}, {-1, 0}}
 	// rotation := [2]int{0, 1}
 
-	startNode := Node{startPos[0], startPos[1], 0, 1, 0, [][2]int{}, map[[2]int]bool{{startPos[0], startPos[1]}: true}}
-	queue := []Node{startNode}
+	startNode := Node1{startPos[0], startPos[1], 0, 1, 0, [][2]int{}, map[[2]int]bool{{startPos[0], startPos[1]}: true}}
+	queue := []Node1{startNode}
 	min_pts := math.MaxInt64
 	for len(queue) > 0 {
 		// fmt.Println(queue)
@@ -112,7 +114,7 @@ func part1(input string) int {
 				seen[[4]int{newX, newY}] = true
 			}
 			prev[[2]int{newX, newY}] = [2]int{x, y}
-			newNode := Node{newX, newY, dir[0], dir[1], pts + 1, [][2]int{}, map[[2]int]bool{{newX, newY}: true}}
+			newNode := Node1{newX, newY, dir[0], dir[1], pts + 1, [][2]int{}, map[[2]int]bool{{newX, newY}: true}}
 			if dir != [2]int{dx, dy} {
 				newNode.pts += 1000
 			}
@@ -124,25 +126,34 @@ func part1(input string) int {
 	return min_pts
 }
 
-func checkIfPathExists(path [][2]int, seen [][][2]int) bool {
-	for i := 0; i < len(seen); i++ {
-		if reflect.DeepEqual(seen[i], path) {
-			return true
-		}
-	}
-	return false
+type Position struct {
+	x, y, dx, dy int
 }
 
-func appendPathToCounter(path [][2]int, ct map[[2]int]struct{}) map[[2]int]struct{} {
-	for i := 0; i < len(path); i++ {
-		ct[[2]int{path[i][0], path[i][1]}] = struct{}{}
-	}
-	return ct
+type Path struct {
+	pts  int
+	pos  Position
+	path [][2]int
 }
 
-func isNotVisited(x, y int, seen map[[2]int]bool) bool {
-	_, ok := seen[[2]int{x, y}]
-	return !ok
+type PriorityQueue []Path
+
+func (pq PriorityQueue) Len() int { return len(pq) }
+func (pq PriorityQueue) Less(i, j int) bool {
+	return pq[i].pts < pq[j].pts
+}
+func (pq PriorityQueue) Swap(i, j int) {
+	pq[i], pq[j] = pq[j], pq[i]
+}
+func (pq *PriorityQueue) Push(x interface{}) {
+	*pq = append(*pq, x.(Path))
+}
+func (pq *PriorityQueue) Pop() interface{} {
+	old := *pq
+	n := len(old)
+	x := old[n-1]
+	*pq = old[0 : n-1]
+	return x
 }
 
 func part2(input string) int {
@@ -166,66 +177,45 @@ func part2(input string) int {
 	dirs := [][2]int{{0, 1}, {1, 0}, {0, -1}, {-1, 0}}
 	counter := make(map[[2]int]struct{})
 
-	startNode := Node{startPos[0], startPos[1], 0, 1, 0, [][2]int{{startPos[0], startPos[1]}}, map[[2]int]bool{{startPos[0], startPos[1]}: true}}
-	queue := [][]Node{{startNode}}
+	startNode := Position{startPos[0], startPos[1], 0, 1}
+	queue := &PriorityQueue{}
+	heap.Init(queue)
 	min_pts := math.MaxInt64
-	for len(queue) > 0 {
-		// fmt.Println(queue)
-		// pop the minimum point from the queue
-		m := math.MaxInt64
-		mi := 0
-		for i := 0; i < len(queue); i++ {
-			if queue[i][len(queue[i])-1].pts < m {
-				m = queue[i][len(queue[i])-1].pts
-				mi = i
-			}
-		}
-		selectedPath := queue[mi]
-		lastNode := selectedPath[len(selectedPath)-1]
-		x, y, dx, dy, pts, currPath, curSeen := lastNode.x, lastNode.y, lastNode.dx, lastNode.dy, lastNode.pts, lastNode.path, lastNode.seen
-		queue = append(queue[:mi], queue[mi+1:]...)
+	seen := make(map[Position]int)
+	heap.Push(queue, Path{0, startNode, [][2]int{startPos}})
+	for queue.Len() > 0 {
+		state := heap.Pop(queue).(Path)
+		pos := state.pos
 
-		if x < 0 || x >= len(board) || y < 0 || y >= len(board[0]) {
-			continue
+		if state.pts > min_pts {
+			break
 		}
-		if board[x][y] == 'E' {
-			if pts > min_pts {
-				break
+		if board[pos.x][pos.y] == 'E' {
+			for _, p := range state.path {
+				counter[[2]int{p[0], p[1]}] = struct{}{}
 			}
-			fmt.Println("Found path with pts: ", pts)
-			min_pts = min(min_pts, pts)
 			continue
 		}
-		fmt.Println("x, y, pts", x, y, pts)
+		if s, ok := seen[pos]; ok && s < state.pts {
+			continue
+		}
+		seen[pos] = state.pts
+		x, y, dx, dy := pos.x, pos.y, pos.dx, pos.dy
 		for _, dir := range dirs {
 			newX, newY := x+dir[0], y+dir[1]
-			newPath := [][2]int{}
-			newPath = append(newPath, currPath...)
-			newPath = append(newPath, [2]int{newX, newY})
-			newSeen := make(map[[2]int]bool)
-			for k, v := range curSeen {
-				newSeen[k] = v
-			}
-			if dir[0]+dx == 0 && dir[1]+dy == 0 {
-				continue
-			}
 			if newX < 0 || newX >= len(board) || newY < 0 || newY >= len(board[0]) {
 				continue
 			}
-			if board[newX][newY] == '#' || curSeen[[2]int{newX, newY}] {
+			if board[newX][newY] == '#' {
 				continue
 			}
-			if board[newX][newY] != 'E' {
-				newSeen[[2]int{newX, newY}] = true
-			}
-			newNode := Node{newX, newY, dir[0], dir[1], pts + 1, newPath, curSeen}
+			newPath := [][2]int{}
+			newPath = append(newPath, state.path...)
 			if dir != [2]int{dx, dy} {
-				newNode.pts += 1000
+				heap.Push(queue, Path{state.pts + 1001, Position{newX, newY, dir[0], dir[1]}, append(newPath, [2]int{newX, newY})})
+			} else {
+				heap.Push(queue, Path{state.pts + 1, Position{newX, newY, dir[0], dir[1]}, append(newPath, [2]int{newX, newY})})
 			}
-			nPath := []Node{}
-			nPath = append(nPath, selectedPath...)
-			nPath = append(nPath, newNode)
-			queue = append(queue, nPath)
 		}
 	}
 

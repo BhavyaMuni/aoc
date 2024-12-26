@@ -7,6 +7,7 @@ import (
 	"math"
 	"strconv"
 	"strings"
+	"time"
 
 	"golang.design/x/clipboard"
 )
@@ -27,6 +28,8 @@ func main() {
 	flag.IntVar(&part, "part", 1, "part 1 or 2")
 	flag.Parse()
 	fmt.Println("Running part", part)
+
+	t := time.Now()
 	err := clipboard.Init()
 	if err != nil {
 		panic(err)
@@ -41,6 +44,7 @@ func main() {
 		clipboard.Write(clipboard.FmtText, []byte(fmt.Sprintf("%v", ans)))
 		fmt.Println("Output:", ans)
 	}
+	fmt.Println("Time:", time.Since(t))
 }
 
 var a uint64 = 0
@@ -62,42 +66,50 @@ func ComboOperand(input uint64) uint64 {
 		return input
 	}
 }
-func adv(operand uint64) (uint64, int) {
+func adv(operand uint64) (uint64, uint64, uint64, int, uint64) {
 	a /= uint64(math.Pow(2, float64(ComboOperand(operand))))
-	return a, ip + 2
+	return a, b, c, ip + 2, 0
+
 }
-func bxl(operand uint64) (uint64, int) {
+func bxl(operand uint64) (uint64, uint64, uint64, int, uint64) {
 	b = uint64(b) ^ uint64(operand)
-	return b, ip + 2
+	return a, b, c, ip + 2, 0
+
 }
-func bst(operand uint64) (uint64, int) {
+func bst(operand uint64) (uint64, uint64, uint64, int, uint64) {
 	b = uint64(ComboOperand(operand)) % 8
-	return b, ip + 2
+	return a, b, c, ip + 2, 0
+
 }
-func jnz(operand uint64) (uint64, int) {
+func jnz(operand uint64) (uint64, uint64, uint64, int, uint64) {
 	if a == 0 {
-		return operand, ip + 2
+		return a, b, c, ip + 2, 0
+
 	}
-	return operand, int(operand)
+	return a, b, c, int(operand), 0
+
 }
-func bxc(operand uint64) (uint64, int) {
+func bxc(operand uint64) (uint64, uint64, uint64, int, uint64) {
 	b = b ^ c
-	return b, ip + 2
+	return a, b, c, ip + 2, 0
+
 }
-func out(operand uint64) (uint64, int) {
+func out(operand uint64) (uint64, uint64, uint64, int, uint64) {
 	out := ComboOperand(operand) % 8
-	return out, ip + 2
+	return a, b, c, ip + 2, out
+
 }
-func bdv(operand uint64) (uint64, int) {
+func bdv(operand uint64) (uint64, uint64, uint64, int, uint64) {
 	b = a / uint64(math.Pow(2, float64(ComboOperand(operand))))
-	return b, ip + 2
+	return a, b, c, ip + 2, 0
+
 }
-func cdv(operand uint64) (uint64, int) {
+func cdv(operand uint64) (uint64, uint64, uint64, int, uint64) {
 	c = a / uint64(math.Pow(2, float64(ComboOperand(operand))))
-	return c, ip + 2
+	return a, b, c, ip + 2, 0
 }
 
-var opcodes = map[uint64]func(uint64) (uint64, int){
+var opcodes = map[uint64]func(uint64) (uint64, uint64, uint64, int, uint64){
 	0: adv,
 	1: bxl,
 	2: bst,
@@ -129,7 +141,9 @@ func part1(input string) int {
 		if !ok {
 			panic("unknown opcode")
 		}
-		out, next := opcode(operand)
+		var next int
+		var out uint64
+		_, _, _, next, out = opcode(operand)
 		ip = next
 		if op == 5 {
 			outs = append(outs, out)
@@ -144,6 +158,80 @@ func part1(input string) int {
 
 }
 
+type seenOut struct {
+	a, b, c, out uint64
+	next         int
+}
+
+func getOutinDec(inp []uint64) int64 {
+	var out int64 = 0
+	for i, n := range inp {
+		out += int64(n) * int64(math.Pow(8, float64(i)))
+	}
+	return out
+}
+
 func part2(input string) int {
-	panic("not implemented")
+	program := []uint64{}
+	programInp := strings.TrimPrefix(strings.Split(input, "\n\n")[1], "Program: ")
+	for _, c := range strings.Split(programInp, ",") {
+		n, _ := strconv.Atoi(c)
+		program = append(program, uint64(n))
+	}
+
+	seen := make(map[[5]uint64]seenOut)
+
+	l := 0
+	r := math.MaxInt64
+	out := math.MaxInt64
+	for l < r {
+		mid := l + (r-l)/2
+		fmt.Println("Trying: ", mid)
+		ip = 0
+		a = uint64(mid)
+		b = 0
+		c = 0
+
+		outs := []uint64{}
+		for ip < len(program) {
+			op := program[ip]
+			operand := program[ip+1]
+			if op == 8 {
+				break
+			}
+			opcode, ok := opcodes[op]
+			if !ok {
+				panic("unknown opcode")
+			}
+			var out uint64
+			if _, ok := seen[[5]uint64{a, b, c, op, operand}]; ok {
+				seenOut := seen[[5]uint64{a, b, c, op, operand}]
+				a = seenOut.a
+				b = seenOut.b
+				c = seenOut.c
+				ip = seenOut.next
+				out = seenOut.out
+			} else {
+				oldA, oldB, oldC := a, b, c
+				a, b, c, ip, out = opcode(operand)
+				seen[[5]uint64{oldA, oldB, oldC, op, operand}] = seenOut{a, b, c, out, ip}
+			}
+			if op == 5 {
+				outs = append(outs, out)
+			}
+		}
+		if getOutinDec(outs) == getOutinDec(program) {
+			out = mid
+			r = mid
+			fmt.Println("Found: ", mid)
+		} else if getOutinDec(outs) < getOutinDec(program) {
+			l = mid + 1
+		} else {
+			r = mid
+		}
+	}
+
+	fmt.Println("Out:", out)
+
+	return 0
 }
